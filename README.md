@@ -336,6 +336,8 @@ o2agent/
 
 ## License
 
-See `LICENSE`. OpenObserve is a trademark / copyright of its respective authors; this
-project is a standalone agent that integrates with OpenObserve and **does not modify
-OpenObserve's source.**
+Released under the **MIT License** — see [`LICENSE`](LICENSE).
+
+OpenObserve is a trademark / copyright of its respective authors; this project is a
+standalone agent that integrates with OpenObserve and **does not modify OpenObserve's
+source** (hence it is not bound by OpenObserve's AGPL).
