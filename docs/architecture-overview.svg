@@ -1,0 +1,146 @@
+<svg width="1000" height="640" viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f4f7ff"/>
+    </linearGradient>
+    <linearGradient id="gBrowser" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e0f2fe"/><stop offset="1" stop-color="#bae6fd"/>
+    </linearGradient>
+    <linearGradient id="gNginx" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dcfce7"/><stop offset="1" stop-color="#bbf7d0"/>
+    </linearGradient>
+    <linearGradient id="gAgent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ede9fe"/><stop offset="1" stop-color="#ddd6fe"/>
+    </linearGradient>
+    <linearGradient id="gOO" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fef3c7"/><stop offset="1" stop-color="#fde68a"/>
+    </linearGradient>
+    <linearGradient id="gLLM" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe4e6"/><stop offset="1" stop-color="#fecdd3"/>
+    </linearGradient>
+    <linearGradient id="gData" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cffafe"/><stop offset="1" stop-color="#a5f3fc"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#64748b"/>
+    </marker>
+    <marker id="arrowP" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrowG" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#059669"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#94a3b8" flood-opacity="0.30"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="640" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="500" y="46" text-anchor="middle" font-size="26" font-weight="700" fill="#1e293b">OpenObserve SRE Agent — Architecture Overview</text>
+  <text x="500" y="72" text-anchor="middle" font-size="14" fill="#64748b">Zero front-end changes · nginx path routing · read-first grounding · 3-tier write gate</text>
+
+  <!-- Browser -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="120" width="200" height="110" rx="16" fill="url(#gBrowser)" stroke="#38bdf8" stroke-width="2"/>
+  </g>
+  <text x="160" y="158" text-anchor="middle" font-size="17" font-weight="700" fill="#075985">Browser</text>
+  <text x="160" y="182" text-anchor="middle" font-size="12.5" fill="#0369a1">OpenObserve native UI</text>
+  <text x="160" y="202" text-anchor="middle" font-size="12.5" fill="#0369a1">AI Assistant chat box</text>
+
+  <!-- nginx -->
+  <g filter="url(#shadow)">
+    <rect x="410" y="110" width="200" height="130" rx="16" fill="url(#gNginx)" stroke="#22c55e" stroke-width="2"/>
+  </g>
+  <text x="510" y="145" text-anchor="middle" font-size="17" font-weight="700" fill="#166534">nginx :8088</text>
+  <text x="510" y="167" text-anchor="middle" font-size="12" fill="#15803d">unified entry / same-origin</text>
+  <text x="510" y="190" text-anchor="middle" font-size="11.5" fill="#15803d">route by URL path</text>
+  <text x="510" y="212" text-anchor="middle" font-size="11.5" fill="#15803d">+ serve front-end dist</text>
+
+  <!-- Agent -->
+  <g filter="url(#shadow)">
+    <rect x="740" y="110" width="210" height="130" rx="16" fill="url(#gAgent)" stroke="#8b5cf6" stroke-width="2"/>
+  </g>
+  <text x="845" y="145" text-anchor="middle" font-size="17" font-weight="700" fill="#5b21b6">o2agent :8799</text>
+  <text x="845" y="167" text-anchor="middle" font-size="11.5" fill="#6d28d9">O2-compatible endpoint</text>
+  <text x="845" y="187" text-anchor="middle" font-size="11.5" fill="#6d28d9">/ai/chat_stream</text>
+  <text x="845" y="210" text-anchor="middle" font-size="11" fill="#6d28d9">agent loop + memory + gate</text>
+
+  <!-- OpenObserve -->
+  <g filter="url(#shadow)">
+    <rect x="410" y="330" width="200" height="120" rx="16" fill="url(#gOO)" stroke="#f59e0b" stroke-width="2"/>
+  </g>
+  <text x="510" y="366" text-anchor="middle" font-size="17" font-weight="700" fill="#92400e">OpenObserve :5080</text>
+  <text x="510" y="390" text-anchor="middle" font-size="11.5" fill="#b45309">community · source unmodified</text>
+  <text x="510" y="410" text-anchor="middle" font-size="11.5" fill="#b45309">data / auth / front-end source</text>
+  <text x="510" y="430" text-anchor="middle" font-size="11.5" fill="#b45309">logs · metrics · traces · alerts</text>
+
+  <!-- LLM -->
+  <g filter="url(#shadow)">
+    <rect x="740" y="330" width="210" height="120" rx="16" fill="url(#gLLM)" stroke="#fb7185" stroke-width="2"/>
+  </g>
+  <text x="845" y="372" text-anchor="middle" font-size="17" font-weight="700" fill="#9f1239">LLM Gateway</text>
+  <text x="845" y="398" text-anchor="middle" font-size="12" fill="#be123c">OpenAI-compatible</text>
+  <text x="845" y="418" text-anchor="middle" font-size="11.5" fill="#be123c">OpenAI / DashScope / self-host</text>
+
+  <!-- Data stores -->
+  <g filter="url(#shadow)">
+    <rect x="410" y="520" width="200" height="86" rx="16" fill="url(#gData)" stroke="#06b6d4" stroke-width="2"/>
+  </g>
+  <text x="510" y="552" text-anchor="middle" font-size="14.5" font-weight="700" fill="#155e75">OpenObserve storage</text>
+  <text x="510" y="574" text-anchor="middle" font-size="11" fill="#0e7490">PostgreSQL · S3/MinIO</text>
+  <text x="510" y="592" text-anchor="middle" font-size="11" fill="#0e7490">(HA cluster)</text>
+
+  <g filter="url(#shadow)">
+    <rect x="740" y="520" width="210" height="86" rx="16" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+  </g>
+  <text x="845" y="552" text-anchor="middle" font-size="14.5" font-weight="700" fill="#334155">Agent memory</text>
+  <text x="845" y="574" text-anchor="middle" font-size="11" fill="#475569">SQLite (sessions / long-term)</text>
+  <text x="845" y="592" text-anchor="middle" font-size="11" fill="#475569">encrypted at rest · retention</text>
+
+  <!-- Arrows: browser -> nginx -->
+  <line x1="260" y1="175" x2="404" y2="175" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <text x="332" y="165" text-anchor="middle" font-size="11" fill="#475569">HTTPS request</text>
+  <text x="332" y="196" text-anchor="middle" font-size="10" fill="#94a3b8">Cookie · session-id</text>
+
+  <!-- nginx -> agent (AI path, highlighted purple) -->
+  <line x1="610" y1="160" x2="734" y2="160" stroke="#7c3aed" stroke-width="2.8" marker-end="url(#arrowP)"/>
+  <text x="672" y="150" text-anchor="middle" font-size="10.5" font-weight="600" fill="#7c3aed">/ai/chat_stream</text>
+
+  <!-- nginx -> OpenObserve (other /api) -->
+  <line x1="510" y1="240" x2="510" y2="324" stroke="#059669" stroke-width="2.4" marker-end="url(#arrowG)"/>
+  <text x="600" y="288" text-anchor="middle" font-size="10.5" fill="#047857">/api /auth /config</text>
+
+  <!-- agent -> OpenObserve (read data) -->
+  <path d="M 785 240 C 720 290, 650 300, 612 360" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-dasharray="6 4" marker-end="url(#arrowP)"/>
+  <text x="690" y="322" text-anchor="middle" font-size="10.5" fill="#7c3aed">read-only (GET)</text>
+
+  <!-- agent -> LLM -->
+  <line x1="845" y1="240" x2="845" y2="324" stroke="#fb7185" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <text x="905" y="288" text-anchor="middle" font-size="10.5" fill="#e11d48">call LLM</text>
+
+  <!-- OO -> data -->
+  <line x1="510" y1="450" x2="510" y2="514" stroke="#06b6d4" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <!-- agent -> memory -->
+  <line x1="845" y1="450" x2="845" y2="514" stroke="#94a3b8" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- server boundary -->
+  <rect x="388" y="92" width="586" height="530" rx="18" fill="none" stroke="#c7d2fe" stroke-width="2" stroke-dasharray="3 6"/>
+  <text x="398" y="112" font-size="11.5" fill="#818cf8" font-weight="600">One server (same-origin, loopback)</text>
+
+  <!-- legend -->
+  <g font-size="11.5">
+    <rect x="60" y="300" width="300" height="150" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="76" y="324" font-size="13" font-weight="700" fill="#334155">Legend</text>
+    <line x1="76" y1="344" x2="108" y2="344" stroke="#7c3aed" stroke-width="2.8" marker-end="url(#arrowP)"/>
+    <text x="118" y="348" fill="#475569">AI chat path &#8594; Agent (the core)</text>
+    <line x1="76" y1="368" x2="108" y2="368" stroke="#059669" stroke-width="2.4" marker-end="url(#arrowG)"/>
+    <text x="118" y="372" fill="#475569">Normal API / auth &#8594; OpenObserve</text>
+    <line x1="76" y1="392" x2="108" y2="392" stroke="#8b5cf6" stroke-width="2.2" stroke-dasharray="6 4" marker-end="url(#arrowP)"/>
+    <text x="118" y="396" fill="#475569">Agent read-only fetch (GET)</text>
+    <line x1="76" y1="416" x2="108" y2="416" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <text x="118" y="420" fill="#475569">Other data flow</text>
+  </g>
+</svg>
