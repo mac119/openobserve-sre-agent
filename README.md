@@ -6,6 +6,10 @@
 
 _Ask about logs, metrics, traces and alerts in natural language; generate and validate SQL / VRL / PromQL; root-cause incidents; create dashboards and alerts (behind a confirmation gate). Every answer reads real data first, then generates — never fabricates._
 
+[![CI](https://github.com/mac119/openobserve-sre-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/mac119/openobserve-sre-agent/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
+
 </div>
 
 ---
@@ -336,8 +340,6 @@ o2agent/
 
 ## License
 
-Released under the **MIT License** — see [`LICENSE`](LICENSE).
-
-OpenObserve is a trademark / copyright of its respective authors; this project is a
-standalone agent that integrates with OpenObserve and **does not modify OpenObserve's
-source** (hence it is not bound by OpenObserve's AGPL).
+See `LICENSE`. OpenObserve is a trademark / copyright of its respective authors; this
+project is a standalone agent that integrates with OpenObserve and **does not modify
+OpenObserve's source.**
