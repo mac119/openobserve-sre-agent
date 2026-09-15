@@ -5,7 +5,7 @@ __pycache__/
 venv/
 .pytest_cache/
 *.egg-info/
-
+docs/openobserve-dashboard-schema.example.json
 # Chinese doc versions are kept locally but not published (English is canonical)
 *.zh.md
 advice.md
