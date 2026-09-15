@@ -45,6 +45,7 @@ class Settings:
     max_repeat_calls: int
     turn_cost_budget_usd: float
     turn_wall_clock_s: float
+    max_tool_iters: int
 
     # Cost & latency (P2)
     parallel_tools: bool
@@ -116,6 +117,7 @@ class Settings:
             turn_cost_budget_usd=float(
                 os.environ.get("O2_TURN_COST_BUDGET_USD", "0")),
             turn_wall_clock_s=float(os.environ.get("O2_TURN_WALL_CLOCK_S", "0")),
+            max_tool_iters=int(os.environ.get("O2_MAX_TOOL_ITERS", "16")),
             parallel_tools=os.environ.get("O2_PARALLEL_TOOLS", "1") in ("1", "true", "True"),
             max_parallel=int(os.environ.get("O2_MAX_PARALLEL", "4")),
             model_small=os.environ.get("O2_MODEL_SMALL", ""),

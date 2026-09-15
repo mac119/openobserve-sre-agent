@@ -108,6 +108,35 @@ TOOL_SPECS: list[dict] = [
                 "name": {"type": "string", "description": "resource name/id (for update/delete)"},
                 "body": {"type": "object", "description": "resource definition (for create/update)"},
             }, "required": ["resource_kind", "action"]}),
+    _schema("build_dashboard",
+            "Build a COMPLETE, schema-valid OpenObserve dashboard from a small "
+            "high-level spec and propose it for approval (goes through the "
+            "confirmation gate — does NOT auto-create). STRONGLY PREFER this over "
+            "propose_change for creating dashboards: it fills in all the required "
+            "OpenObserve panel boilerplate for you, so you only provide the title "
+            "and a list of panels (each with a chart type, a chart SQL using "
+            "x_axis/y_axis/z_axis aliases, and the axis field/aggregation). Build "
+            "ALL panels in ONE call. After the user approves, call approve_change ONCE.",
+            {"type": "object", "properties": {
+                "title": {"type": "string"},
+                "description": {"type": "string"},
+                "stream": {"type": "string", "description": "default stream for panels"},
+                "panels": {"type": "array", "description": "one entry per panel", "items": {
+                    "type": "object", "properties": {
+                        "title": {"type": "string"},
+                        "type": {"type": "string",
+                                 "description": "line|bar|area|pie|table|scatter"},
+                        "query": {"type": "string",
+                                  "description": "chart SQL with x_axis_1/y_axis_1[/z_axis_1] aliases"},
+                        "stream": {"type": "string"},
+                        "x": {"type": "object",
+                              "description": "{field, alias, function} e.g. field=_timestamp function=histogram"},
+                        "y": {"type": "object",
+                              "description": "{field, alias, function} e.g. function=count"},
+                        "breakdown": {"type": "object",
+                                      "description": "optional {field, alias} for the z-axis series"},
+                    }, "required": ["query"]}},
+            }, "required": ["title", "panels"]}),
     _schema("approve_change",
             "Approve AND execute a change that you previously created with "
             "propose_change, when — and ONLY when — the user has clearly approved it "
@@ -229,43 +258,99 @@ class ToolRegistry:
         self.write_tools = write_tools
         self._dispatch["propose_change"] = self._propose_change
         self._dispatch["approve_change"] = self._approve_change
+        self._dispatch["build_dashboard"] = self._build_dashboard
+
+    def _build_dashboard(self, a: dict) -> ToolResult:
+        """Assemble a full, schema-valid dashboard body from a small spec and
+        propose it through the gate (single change for the whole dashboard)."""
+        if self.write_tools is None:
+            return ToolResult(ok=False, error="write path not configured")
+        from .dashboard_builder import build_dashboard_body
+        try:
+            body = build_dashboard_body(a)
+        except ValueError as e:
+            return ToolResult(ok=False, error=f"invalid dashboard spec: {e}")
+        # reuse propose_change's de-dup + note handling
+        return self._propose_change({
+            "resource_kind": "dashboard", "action": "create", "body": body,
+        })
 
     def _approve_change(self, a: dict) -> ToolResult:
-        """Approve + execute a pending change through the gate. Returns the REAL
-        result so the model can never fabricate a 'created' success."""
+        """Approve + execute pending change(s) through the gate, returning the REAL
+        result. Robust against a propose/approve loop: when the user just says
+        'approve' (no id), this approves & executes ALL currently-pending
+        standard-tier changes in one shot, so there is nothing left to re-approve.
+        Elevated (Tier 3) changes still require an explicit id + confirmation."""
         if self.gate is None:
             return ToolResult(ok=False, error="write path not configured")
         cid = a.get("change_id") or ""
-        if not cid:
-            return ToolResult(ok=False, error="change_id is required")
         phrase = a.get("confirmation")
-        try:
-            self.gate.approve(cid, elevated_confirmation=phrase)
-            change = self.gate.execute(cid)
-        except Exception as e:  # GateError (unknown id / wrong state / needs elevation)
-            return ToolResult(ok=False, error=f"approve failed: {e}")
-        r = change.result
-        ok = bool(r and r.ok)
-        dry = bool(r and r.dry_run)
-        return ToolResult(
-            ok=ok,
-            data={
-                "change_id": change.id,
-                "state": change.state.value,
-                "executed": ok,
-                "dry_run": dry,
+        changes = getattr(self.gate, "_changes", {})
+
+        # Resolve the set of changes to act on.
+        if cid and cid in changes:
+            targets = [changes[cid]]
+        else:
+            targets = [c for c in changes.values() if c.state.value == "pending"]
+            targets.sort(key=lambda c: c.created_at)
+
+        if not targets:
+            # nothing pending — report the most recent finished change, if any
+            done = sorted((c for c in changes.values()
+                           if c.state.value in ("done", "failed")),
+                          key=lambda c: (c.resolved_at or 0))
+            if done:
+                last = done[-1]
+                r0 = last.result
+                ok0 = bool(r0 and r0.ok)
+                return ToolResult(ok=ok0, data={
+                    "change_id": last.id, "state": last.state.value,
+                    "executed": ok0, "already_done": True,
+                    "note": "The change was already executed. Report this and stop.",
+                }, error=(None if ok0 else "previously failed"))
+            return ToolResult(ok=False, error="no pending change to approve")
+
+        executed, failed, skipped = [], [], []
+        for c in targets:
+            if c.state.value in ("done", "failed"):
+                continue  # idempotent: already handled
+            if c.state.value != "pending":
+                continue
+            if c.tier.value == "elevated" and (
+                    not phrase or c.resource_kind not in phrase):
+                skipped.append({"change_id": c.id, "resource_kind": c.resource_kind,
+                                "reason": "elevated: needs confirmation naming the resource"})
+                continue
+            try:
+                self.gate.approve(c.id, elevated_confirmation=phrase)
+                done_c = self.gate.execute(c.id)
+            except Exception as e:
+                failed.append({"change_id": c.id, "error": f"{e}"})
+                continue
+            r = done_c.result
+            (executed if (r and r.ok) else failed).append({
+                "change_id": done_c.id,
+                "state": done_c.state.value,
+                "dry_run": bool(r and r.dry_run),
                 "result": (r.data if r else None),
-                "note": (
-                    "SIMULATED ONLY (dry_run) — nothing was actually written to "
-                    "OpenObserve. Tell the user it was a dry run; set "
-                    "O2_WRITE_DRY_RUN=0 on the server to enable real writes."
-                    if dry else
-                    ("Change executed successfully." if ok else
-                     "Change did NOT execute successfully; report the failure, do "
-                     "not claim it was created.")
-                ),
-            },
-            error=(None if ok else (r.error if r else "execution failed")),
+                "error": (None if (r and r.ok) else (r.error if r else "execution failed")),
+            })
+
+        any_ok = bool(executed)
+        any_dry = any(e.get("dry_run") for e in executed)
+        note = ("Change(s) executed successfully — STOP now; do NOT propose or "
+                "approve again." if any_ok and not any_dry else
+                "SIMULATED ONLY (dry_run) — nothing was actually written; set "
+                "O2_WRITE_DRY_RUN=0 to enable real writes. STOP now." if any_dry else
+                "No change executed. Report the failure honestly; do NOT retry by "
+                "re-proposing.")
+        return ToolResult(
+            ok=any_ok,
+            data={"executed": executed, "failed": failed, "skipped": skipped,
+                  "note": note},
+            error=(None if any_ok else
+                   (failed[0]["error"] if failed else
+                    (skipped[0]["reason"] if skipped else "nothing executed"))),
         )
 
     def _propose_change(self, a: dict) -> ToolResult:
@@ -275,6 +360,21 @@ class ToolRegistry:
         action = (a.get("action") or "").lower()
         name = a.get("name") or ""
         body = a.get("body") or {}
+        # De-dup: if an equivalent change is already pending, reuse it instead of
+        # stacking duplicates (guards against a propose/approve loop on retries).
+        try:
+            for c in getattr(self.gate, "_changes", {}).values():
+                if (c.state.value == "pending" and c.resource_kind == kind
+                        and c.action == action and (c.body or {}) == body):
+                    return ToolResult(ok=True, data={
+                        "change_id": c.id, "tier": c.tier.value,
+                        "state": c.state.value, "diff": c.diff,
+                        "note": ("An identical proposal already exists — reusing it. "
+                                 "Do NOT create another. When the user approves, call "
+                                 "approve_change ONCE with this change_id."),
+                    })
+        except Exception:
+            pass
         try:
             if action == "delete":
                 change = self.write_tools.delete_resource(kind, name)

@@ -308,8 +308,16 @@ class Agent:
         specs = self.registry.specs()
         start_cost = self.mem.session_usage(session_id)["cost_usd"]
         call_counts: dict[str, int] = {}
+        max_iters = getattr(self.s, "max_tool_iters", _MAX_TOOL_ITERS)
+        # Per-turn guard against propose/approve loops: once a write has been
+        # executed (or too many write attempts made) in THIS turn, block further
+        # mutating tool calls so the model must summarize instead of looping.
+        write_attempts = 0
+        write_executed = False
+        _WRITE_TOOLS = {"propose_change", "approve_change"}
+        _MAX_WRITE_ATTEMPTS = 2
 
-        for i in range(_MAX_TOOL_ITERS):
+        for i in range(max_iters):
             # loop control: stop gracefully if the turn blows its budget
             over = self._turn_over_budget(req_start, start_cost, session_id)
             if over:
@@ -345,11 +353,33 @@ class Agent:
                     sig = name + ":" + json.dumps(args, sort_keys=True, default=str)
                     call_counts[sig] = call_counts.get(sig, 0) + 1
                     blocked = repeat_blocked(call_counts[sig], self.s.max_repeat_calls)
-                    planned.append({"tc": tc, "name": name, "args": args, "blocked": blocked})
+                    block_reason = None
+                    # per-turn write-loop guard
+                    if name in _WRITE_TOOLS:
+                        write_attempts += 1
+                        if write_executed:
+                            blocked = True
+                            block_reason = ("a change was already executed in this "
+                                            "turn; do not propose or approve again — "
+                                            "summarize the result and stop.")
+                        elif write_attempts > _MAX_WRITE_ATTEMPTS:
+                            blocked = True
+                            block_reason = ("too many write attempts in one turn; "
+                                            "stop and report status instead of "
+                                            "retrying propose/approve.")
+                    planned.append({"tc": tc, "name": name, "args": args,
+                                    "blocked": blocked, "block_reason": block_reason})
                     _emit_progress("tool_start", tool=name, args=args)
 
                 # execute: read-safe calls in parallel, mutating ones serial
                 results = self._execute_planned(planned, session_id)
+
+                # note whether a mutating change actually executed this turn
+                for idx, p in enumerate(planned):
+                    if p["name"] == "approve_change":
+                        r = results.get(idx)
+                        if r is not None and r.ok:
+                            write_executed = True
 
                 # finalize in original order (persist + append tool messages)
                 for idx, p in enumerate(planned):
@@ -404,8 +434,9 @@ class Agent:
         runnable: list[tuple[int, dict]] = []
         for idx, p in enumerate(planned):
             if p["blocked"]:
-                results[idx] = ToolResult(ok=False, error=_REPEAT_MSG.format(
-                    name=p["name"], n=self.s.max_repeat_calls))
+                reason = p.get("block_reason") or _REPEAT_MSG.format(
+                    name=p["name"], n=self.s.max_repeat_calls)
+                results[idx] = ToolResult(ok=False, error=reason)
                 self.tel.emit("repeat_call_blocked", session=session_id, tool=p["name"])
             else:
                 runnable.append((idx, p))
