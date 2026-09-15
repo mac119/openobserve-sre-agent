@@ -8,3 +8,4 @@ venv/
 
 # Chinese doc versions are kept locally but not published (English is canonical)
 *.zh.md
+advice.md
