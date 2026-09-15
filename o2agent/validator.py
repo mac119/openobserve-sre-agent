@@ -34,6 +34,11 @@ _FROM_RE = re.compile(r'\bfrom\s+"?([A-Za-z_][A-Za-z0-9_]*)"?', re.I)
 # identifiers: bare or double-quoted; skip string literals in single quotes
 _IDENT_RE = re.compile(r'"([A-Za-z_][A-Za-z0-9_]*)"|\b([A-Za-z_][A-Za-z0-9_]*)\b')
 _STRING_LIT_RE = re.compile(r"'[^']*'")
+# column aliases introduced via `AS "alias"` or `AS alias` — these are output
+# names (e.g. chart axes `"x_axis_1"`, `"y_axis_1"`, `"z_axis_1"`), NOT stream
+# fields, so they must be excluded from schema field-existence checks and are
+# legal to reference in GROUP BY / ORDER BY.
+_ALIAS_RE = re.compile(r'\bas\s+(?:"([A-Za-z_][A-Za-z0-9_]*)"|([A-Za-z_][A-Za-z0-9_]*))', re.I)
 
 
 @dataclass
@@ -115,10 +120,17 @@ class SQLValidator:
     def _referenced_fields(self, sql: str, stream: str) -> set[str]:
         # drop string literals so their contents aren't treated as identifiers
         cleaned = _STRING_LIT_RE.sub("''", sql)
+        # collect column aliases (`AS "x_axis_1"` etc.) — output names, not fields
+        aliases = {
+            (q or b).lower()
+            for q, b in _ALIAS_RE.findall(cleaned)
+        }
         found: set[str] = set()
         for quoted, bare in _IDENT_RE.findall(cleaned):
             tok = quoted or bare
             low = tok.lower()
+            if low in aliases:  # an output alias, not a stream field
+                continue
             if quoted:  # explicitly quoted identifier -> treat as field
                 if low != stream.lower():
                     found.add(tok)

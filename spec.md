@@ -200,6 +200,47 @@ Help create:
 
 Confirm before creating, modifying, or deleting persistent resources.
 
+#### Chart / visualization SQL (OpenObserve panel convention)
+
+There are TWO distinct SQL shapes. Pick the right one from the user's intent:
+
+1. **Log/table query** — for reading or ranking raw records. Free-form
+   projection, e.g.:
+   `SELECT ap_name, COUNT(*), COUNT(DISTINCT event_code) FROM "aruba"
+    WHERE ap_name IS NOT NULL GROUP BY ap_name ORDER BY COUNT(*) DESC LIMIT 10`
+
+2. **Chart / visualization query** — when the user asks to **chart / plot /
+   graph / visualize / trend over time / build a panel**. OpenObserve panels
+   expect axis-aliased columns. Follow this convention EXACTLY:
+   - X axis (time): `histogram(_timestamp) as "x_axis_1"`
+   - Y axis (metric): an aggregate `as "y_axis_1"` (e.g. `count(_timestamp)`,
+     `count(*)`, `avg(<field>)`), add `"y_axis_2"` … for multiple metrics.
+   - Z axis (breakdown/series, optional): a dimension `as "z_axis_1"`
+     (e.g. `ap_name as "z_axis_1"`).
+   - `GROUP BY x_axis_1[, z_axis_1]` and `ORDER BY x_axis_1 ASC`.
+
+   Canonical example (time series of event count per AP):
+   ```sql
+   SELECT histogram(_timestamp) as "x_axis_1",
+          count(_timestamp) as "y_axis_1",
+          ap_name as "z_axis_1"
+   FROM "aruba"
+   WHERE ap_name IS NOT NULL
+   GROUP BY x_axis_1, z_axis_1
+   ORDER BY x_axis_1 ASC
+   ```
+
+   Rules:
+   - Time-series charts MUST bucket time with `histogram(_timestamp)` as
+     `"x_axis_1"` — do not chart a raw timestamp.
+   - Use the real stream and real fields (verify via `get_schema` first); only
+     the `x_axis_*` / `y_axis_*` / `z_axis_*` names are aliases.
+   - For a non-time category chart (bar/pie), the X axis is the category
+     dimension `as "x_axis_1"` instead of `histogram(...)`.
+   - When the user asks to "build a dashboard / panel", provide this chart SQL
+     AND (only if they want it persisted) PROPOSE a dashboard change via the
+     confirmation gate — never auto-create it.
+
 ## 4. Tool-Use Policy
 
 Every operation is classified into one of three tiers. The tier determines
