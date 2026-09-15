@@ -84,9 +84,19 @@ Everything below runs inside the **native OpenObserve AI Assistant chat box**, a
 
 ![Chart / visualization SQL](docs/screenshots/03-chart-sql.png)
 
-**Build a dashboard panel — propose → you approve → it actually executes (no fake "created"):**
+**Build a whole dashboard end-to-end — one request, confirmation-gated, actually created.**
 
-![Approve and execute a change](docs/screenshots/04-approve-execute.png)
+_1) You ask for a dashboard; the agent gathers schema, validates each panel's SQL, and **proposes** the full multi-panel dashboard for review (nothing created yet):_
+
+![Dashboard proposal](docs/screenshots/05-dashboard-propose.png)
+
+_2) You reply **approve** — the agent runs `approve_change` and reports the **real** result (real dashboard id, no fabrication):_
+
+![Dashboard approved and created](docs/screenshots/06-dashboard-approved.png)
+
+_3) The dashboard is live in OpenObserve with all panels rendering real data:_
+
+![Dashboard rendered in OpenObserve](docs/screenshots/07-dashboard-rendered.png)
 
 ---
 
