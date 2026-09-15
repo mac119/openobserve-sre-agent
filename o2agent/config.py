@@ -24,6 +24,7 @@ class Settings:
     http_timeout: float
     max_rows: int
     scan_records_budget: int
+    write_dry_run: bool  # if True, approved writes are simulated, not sent
 
     # Phase 8 security controls
     endpoint_allowlist: tuple[str, ...]  # allowed hosts; empty = unrestricted
@@ -99,6 +100,7 @@ class Settings:
             http_timeout=float(os.environ.get("O2_HTTP_TIMEOUT", "30")),
             max_rows=int(os.environ.get("O2_MAX_ROWS", "1000")),
             scan_records_budget=int(os.environ.get("O2_SCAN_RECORDS_BUDGET", "5000000")),
+            write_dry_run=os.environ.get("O2_WRITE_DRY_RUN", "1") in ("1", "true", "True"),
             endpoint_allowlist=endpoint_allowlist,
             retention_days=int(os.environ.get("O2_RETENTION_DAYS", "0")),
             memory_key=os.environ.get("O2_MEMORY_KEY", ""),

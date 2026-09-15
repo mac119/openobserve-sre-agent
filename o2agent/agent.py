@@ -209,8 +209,10 @@ class Agent:
         self.registry = ToolRegistry(self.tools, self.resolver, self.validator,
                                      generation=self.generation,
                                      scan_budget=settings.scan_records_budget)
-        # write path: dry-run by default; real writes require explicit opt-in.
-        self.write_client = WriteClient(settings, telemetry=self.tel, dry_run=True,
+        # write path: dry-run by default; real writes require explicit opt-in
+        # (O2_WRITE_DRY_RUN=0) so an approved change can actually be created.
+        self.write_client = WriteClient(settings, telemetry=self.tel,
+                                        dry_run=settings.write_dry_run,
                                         auth=actor_auth)
         self.gate = ConfirmationGate(self.write_client, telemetry=self.tel)
         self.write_tools = WriteTools(self.gate, settings.org)

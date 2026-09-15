@@ -108,6 +108,21 @@ TOOL_SPECS: list[dict] = [
                 "name": {"type": "string", "description": "resource name/id (for update/delete)"},
                 "body": {"type": "object", "description": "resource definition (for create/update)"},
             }, "required": ["resource_kind", "action"]}),
+    _schema("approve_change",
+            "Approve AND execute a change that you previously created with "
+            "propose_change, when — and ONLY when — the user has clearly approved it "
+            "(e.g. they replied 'approve' / 'yes' / 'go ahead'). This actually runs "
+            "the change through the confirmation gate and returns the REAL result. "
+            "You MUST NOT claim a change was created/executed unless this tool "
+            "returned ok=true. For an elevated (Tier 3) change, pass 'confirmation' "
+            "that names the resource. If the result has dry_run=true, tell the user it "
+            "was only simulated (not actually written) because the server runs in "
+            "dry-run mode.",
+            {"type": "object", "properties": {
+                "change_id": {"type": "string", "description": "the id returned by propose_change"},
+                "confirmation": {"type": "string",
+                                 "description": "for elevated changes: a phrase naming the resource"},
+            }, "required": ["change_id"]}),
 ]
 
 
@@ -213,6 +228,45 @@ class ToolRegistry:
         self.gate = gate
         self.write_tools = write_tools
         self._dispatch["propose_change"] = self._propose_change
+        self._dispatch["approve_change"] = self._approve_change
+
+    def _approve_change(self, a: dict) -> ToolResult:
+        """Approve + execute a pending change through the gate. Returns the REAL
+        result so the model can never fabricate a 'created' success."""
+        if self.gate is None:
+            return ToolResult(ok=False, error="write path not configured")
+        cid = a.get("change_id") or ""
+        if not cid:
+            return ToolResult(ok=False, error="change_id is required")
+        phrase = a.get("confirmation")
+        try:
+            self.gate.approve(cid, elevated_confirmation=phrase)
+            change = self.gate.execute(cid)
+        except Exception as e:  # GateError (unknown id / wrong state / needs elevation)
+            return ToolResult(ok=False, error=f"approve failed: {e}")
+        r = change.result
+        ok = bool(r and r.ok)
+        dry = bool(r and r.dry_run)
+        return ToolResult(
+            ok=ok,
+            data={
+                "change_id": change.id,
+                "state": change.state.value,
+                "executed": ok,
+                "dry_run": dry,
+                "result": (r.data if r else None),
+                "note": (
+                    "SIMULATED ONLY (dry_run) — nothing was actually written to "
+                    "OpenObserve. Tell the user it was a dry run; set "
+                    "O2_WRITE_DRY_RUN=0 on the server to enable real writes."
+                    if dry else
+                    ("Change executed successfully." if ok else
+                     "Change did NOT execute successfully; report the failure, do "
+                     "not claim it was created.")
+                ),
+            },
+            error=(None if ok else (r.error if r else "execution failed")),
+        )
 
     def _propose_change(self, a: dict) -> ToolResult:
         if self.write_tools is None:
@@ -243,9 +297,12 @@ class ToolRegistry:
                 "tier": change.tier.value,
                 "state": change.state.value,
                 "diff": change.diff,
-                "note": ("This is a PROPOSAL only. It will NOT run until the user "
-                         "approves it. " + ("Elevated (Tier 3) change: requires "
-                         "explicit confirmation naming the resource."
+                "note": ("This is a PROPOSAL only. It has NOT run. Do NOT tell the "
+                         "user it was created. When the user approves (e.g. replies "
+                         "'approve'/'yes'), you MUST call the approve_change tool with "
+                         "this change_id to actually execute it, then report the tool's "
+                         "REAL result. " + ("Elevated (Tier 3): approve_change needs a "
+                         "'confirmation' that names the resource."
                          if change.tier.value == "elevated" else "")),
             },
         )
