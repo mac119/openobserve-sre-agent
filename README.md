@@ -72,15 +72,7 @@ See the sequence diagram in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 Everything below runs inside the **native OpenObserve AI Assistant chat box**, answered by this agent — read-first, grounded in real data, with confirmation-gated writes.
 
-**Ask about your data — grounded in the live API (no fabrication):**
-
-![List streams from the live API](docs/screenshots/01-list-streams.png)
-
-**Inspect a stream's schema before any field-specific work:**
-
-![Stream schema](docs/screenshots/02-schema.png)
-
-**Ask for a chart — get OpenObserve panel SQL (`histogram` + x/y/z axes):**
+**Ask for a chart — the agent verifies the schema, then returns OpenObserve panel SQL (`histogram` + x/y/z axes):**
 
 ![Chart / visualization SQL](docs/screenshots/03-chart-sql.png)
 
