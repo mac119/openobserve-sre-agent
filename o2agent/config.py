@@ -74,6 +74,7 @@ class Settings:
     llm_base_url: str
     llm_api_key: str
     llm_model: str
+    llm_fallback_models: tuple[str, ...]  # tried in order when the primary is rate-limited/fails
 
     # cost model: USD per 1M tokens
     price_in_per_mtok: float
@@ -137,6 +138,10 @@ class Settings:
             llm_base_url=os.environ.get("LLM_BASE_URL", ""),
             llm_api_key=os.environ.get("LLM_API_KEY", ""),
             llm_model=os.environ.get("LLM_MODEL", ""),
+            llm_fallback_models=tuple(
+                m.strip() for m in os.environ.get("LLM_FALLBACK_MODELS", "").split(",")
+                if m.strip()
+            ),
             price_in_per_mtok=float(os.environ.get("LLM_PRICE_IN_PER_MTOK", "0")),
             price_out_per_mtok=float(os.environ.get("LLM_PRICE_OUT_PER_MTOK", "0")),
             log_echo_stderr=os.environ.get("O2_LOG_ECHO", "0") in ("1", "true", "True"),

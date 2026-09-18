@@ -8,6 +8,7 @@ which the agent loop treats as the canonical internal shape.
 """
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
@@ -51,9 +52,11 @@ class OpenAICompatProvider(LLMProvider):
     """Works with any OpenAI-compatible /chat/completions endpoint
     (LiteLLM gateway, OpenAI, DashScope compat mode, etc.)."""
 
-    def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 60):
+    def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 60,
+                 fallback_models: tuple[str, ...] = ()):
         self._base = base_url.rstrip("/")
         self._model = model
+        self._fallbacks = tuple(fallback_models)
         self._http = httpx.Client(
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -62,25 +65,7 @@ class OpenAICompatProvider(LLMProvider):
             timeout=timeout,
         )
 
-    def chat(
-        self,
-        messages: list[dict],
-        tools: list[dict] | None = None,
-        *,
-        temperature: float = 0.0,
-        max_tokens: int = 2048,
-        model: str | None = None,
-    ) -> LLMResponse:
-        payload: dict[str, Any] = {
-            "model": model or self._model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-        if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
-
+    def _post_once(self, payload: dict) -> LLMResponse:
         resp = self._http.post(f"{self._base}/chat/completions", json=payload)
         resp.raise_for_status()
         data = resp.json()
@@ -98,6 +83,61 @@ class OpenAICompatProvider(LLMProvider):
             raw=data,
         )
 
+    def chat(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        *,
+        temperature: float = 0.0,
+        max_tokens: int = 2048,
+        model: str | None = None,
+    ) -> LLMResponse:
+        base_payload: dict[str, Any] = {
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if tools:
+            base_payload["tools"] = tools
+            base_payload["tool_choice"] = "auto"
+
+        # Try the requested/primary model first, then each fallback in order.
+        # This survives per-model rate limits (429) and transient 5xx: when a
+        # model is rate-limited, switch to the next instead of failing the turn.
+        primary = model or self._model
+        candidates: list[str] = [primary]
+        for m in self._fallbacks:
+            if m and m not in candidates:
+                candidates.append(m)
+
+        last_exc: Exception | None = None
+        for idx, cand in enumerate(candidates):
+            payload = dict(base_payload, model=cand)
+            # brief retry with backoff on 429/5xx for THIS model before moving on
+            for attempt in range(2):
+                try:
+                    return self._post_once(payload)
+                except httpx.HTTPStatusError as e:
+                    status = e.response.status_code if e.response is not None else None
+                    last_exc = e
+                    if status == 429 or (status is not None and 500 <= status < 600):
+                        # transient: back off once, then fall through to next model
+                        if attempt == 0:
+                            time.sleep(0.8)
+                            continue
+                        break  # give up on this model, try the next candidate
+                    raise  # non-retryable (4xx other than 429): surface immediately
+                except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError) as e:
+                    last_exc = e
+                    if attempt == 0:
+                        time.sleep(0.8)
+                        continue
+                    break
+        # all candidates exhausted
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("LLM chat failed with no response and no exception")
+
     def close(self) -> None:
         self._http.close()
 
@@ -112,5 +152,6 @@ def build(settings: Settings) -> LLMProvider:
             base_url=settings.llm_base_url,
             api_key=settings.llm_api_key,
             model=settings.llm_model,
+            fallback_models=getattr(settings, "llm_fallback_models", ()),
         )
     raise RuntimeError(f"unknown LLM_PROVIDER: {provider!r}")
